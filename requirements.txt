@@ -1,0 +1,12 @@
+# Core transcription and scene detection
+faster-whisper>=1.2.0
+scenedetect[opencv]>=0.6.7
+
+# CUDA runtime libraries for NVIDIA GPUs on Windows/Linux
+# Not strictly required on CPU-only machines but harmless to install
+nvidia-cudnn-cu12>=9.0.0
+
+# Google Drive / Docs integration (optional: only for --google-doc)
+google-auth>=2.30.0
+google-auth-oauthlib>=1.2.0
+google-api-python-client>=2.150.0

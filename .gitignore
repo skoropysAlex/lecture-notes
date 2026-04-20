@@ -1,0 +1,52 @@
+﻿# --- SECRETS: НІКОЛИ не комітити ---
+credentials.json
+token.json
+*.credentials.json
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+.env
+
+# --- Environments ---
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Output of this tool ---
+output/
+*.transcript.json
+debug.log
+
+# --- Models cache (whisper downloads) ---
+.cache/
+models/
+
+# --- Temp / scratch ---
+*.tmp
+*.bak
+
+# --- Video files (зайві в репо) ---
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.webm
