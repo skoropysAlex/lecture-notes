@@ -115,7 +115,11 @@ def ocr_image(drive, image_path: Path, language_hint: str = "uk") -> str:
 # ============================================================
 
 def upload_image_to_drive(drive, image_path: Path, parent_folder_id: str) -> str:
-    """Uploads an image as a regular file (no conversion). Returns file ID."""
+    """
+    Uploads an image as a regular file (no conversion, no public permission).
+    Returns file ID. Caller is responsible for granting/revoking 'anyone'
+    permission temporarily if the image needs to be embedded into a Google Doc.
+    """
     media = MediaFileUpload(str(image_path), mimetype="image/png", resumable=False)
     file_meta = {
         "name": image_path.name,
@@ -124,12 +128,25 @@ def upload_image_to_drive(drive, image_path: Path, parent_folder_id: str) -> str
     created = drive.files().create(
         body=file_meta, media_body=media, fields="id"
     ).execute()
-    # Make it readable by anyone with the link — needed for embedding into Docs
-    drive.permissions().create(
-        fileId=created["id"],
-        body={"role": "reader", "type": "anyone"},
-    ).execute()
     return created["id"]
+
+
+def grant_anyone_read(drive, file_id: str) -> str:
+    """Temporarily grants 'anyone with link' read access. Returns permission ID."""
+    perm = drive.permissions().create(
+        fileId=file_id,
+        body={"role": "reader", "type": "anyone"},
+        fields="id",
+    ).execute()
+    return perm["id"]
+
+
+def revoke_permission(drive, file_id: str, permission_id: str) -> None:
+    """Removes a previously-granted permission. Best-effort — failures ignored."""
+    try:
+        drive.permissions().delete(fileId=file_id, permissionId=permission_id).execute()
+    except HttpError:
+        pass
 
 
 def create_drive_folder(drive, name: str, parent_id: str | None = None) -> str:
@@ -147,9 +164,13 @@ def find_or_create_folder(drive, name: str, parent_id: str | None = None) -> str
     creates it. Returns folder ID. Reusing the same folder across runs keeps
     the user's Drive organized in one place.
     """
+    # Escape single quotes in name to prevent Drive query injection.
+    # Folder names like "O'Brien" would otherwise break the q= parameter.
+    safe_name = name.replace("\\", "\\\\").replace("'", "\\'")
+
     # Build search query
     query_parts = [
-        f"name = '{name}'",
+        f"name = '{safe_name}'",
         "mimeType = 'application/vnd.google-apps.folder'",
         "trashed = false",
     ]
@@ -187,11 +208,19 @@ def build_google_doc(drive, docs, title: str,
         fields="id, parents",
     ).execute()
 
-    # 2. Upload all slide images first (Docs needs URLs to insert images)
+    # 2. Upload all slide images first (Docs needs URLs to insert images).
+    # Google Docs API requires images to be publicly accessible at insertion time
+    # (it fetches the URL server-side). We grant 'anyone with link' read access
+    # temporarily, embed the images, then revoke the permission so the originals
+    # are private again. The embedded copies inside the Doc remain visible to
+    # anyone with access to the Doc itself, as expected.
     print(f"      Uploading {len(slides)} slide images to Drive...")
     image_urls = {}
+    image_perms = {}  # file_id -> permission_id, for cleanup
     for s in slides:
         img_id = upload_image_to_drive(drive, s["image_path"], folder_id)
+        perm_id = grant_anyone_read(drive, img_id)
+        image_perms[img_id] = perm_id
         # Direct download link works for inlineImage
         image_urls[s["index"]] = f"https://drive.google.com/uc?id={img_id}&export=download"
 
@@ -285,6 +314,14 @@ def build_google_doc(drive, docs, title: str,
                 ).execute()
             except HttpError as e:
                 print(f"      [warn] Image batch {i}-{i+BATCH} failed: {e}")
+
+    # Revoke 'anyone with link' permissions now that images are embedded.
+    # The Doc itself keeps its own copies/references; raw image files in Drive
+    # are no longer publicly accessible.
+    if image_perms:
+        print(f"      Revoking public access on {len(image_perms)} images...")
+        for file_id, perm_id in image_perms.items():
+            revoke_permission(drive, file_id, perm_id)
 
     doc_url = f"https://docs.google.com/document/d/{doc_id}/edit"
     return doc_id, doc_url

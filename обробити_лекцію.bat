@@ -56,12 +56,14 @@ if errorlevel 1 (
 
 REM ---- Stage 1: transcription ----
 REM Uses medium model by default — change to large-v3 for better quality (slower)
+REM --no-confirm-language: skip interactive language prompt so drag-and-drop
+REM doesn't hang waiting for input. Whisper auto-detects from first 30s.
 echo ==========================================================
 echo   Етап 1/2: Транскрипція ^(GPU, ~10-15 хв на годину відео^)
 echo ==========================================================
 echo.
 
-python process.py "%VIDEO%" --model medium
+python process.py "%VIDEO%" --model medium --no-confirm-language
 
 REM ctranslate2 may crash Python after transcription on some Blackwell GPUs —
 REM that's OK, the transcript was cached. We just continue to stage 2.
@@ -72,7 +74,7 @@ echo   Етап 2/2: Markdown + Google Doc з OCR
 echo ==========================================================
 echo.
 
-python process.py "%VIDEO%" --model medium --google-doc
+python process.py "%VIDEO%" --model medium --google-doc --no-confirm-language
 if errorlevel 1 (
     echo.
     echo [ERROR] Етап 2 завершився з помилкою.

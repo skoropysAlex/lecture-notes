@@ -123,10 +123,10 @@ def extract_slide_frames(video_path: Path, timestamps: list[float],
 # ============================================================
 
 def detect_language_first(video_path: Path, model_size: str,
-                          sample_seconds: int = 30) -> str:
+                          sample_seconds: int = 30) -> tuple[str, float]:
     """
     Quick language detection on the first N seconds of audio.
-    Returns the detected language code (e.g. 'uk', 'en', 'ru').
+    Returns (language_code, confidence) — e.g. ('uk', 0.98).
 
     Runs whisper with language=None but stops after first segment so we spend
     only a few seconds on detection. The main transcription happens later
@@ -200,6 +200,9 @@ def confirm_language(detected: str, confidence: float) -> str:
     if not choice:
         return detected
     return choice
+
+
+def transcribe(video_path: Path, model_size: str,
                language: str = "uk") -> tuple[list[dict], float, str]:
     """
     Returns (segments, duration, detected_language).
