@@ -217,17 +217,20 @@ def build_google_doc(drive, docs, title: str,
     print(f"      Uploading {len(slides)} slide images to Drive...")
     image_urls = {}
     image_perms = {}  # file_id -> permission_id, for cleanup
-    for s in slides:
-        img_id = upload_image_to_drive(drive, s["image_path"], folder_id)
-        perm_id = grant_anyone_read(drive, img_id)
-        image_perms[img_id] = perm_id
-        # Direct download link works for inlineImage
-        image_urls[s["index"]] = f"https://drive.google.com/uc?id={img_id}&export=download"
 
-    # Wrap the rest in try/finally so we ALWAYS revoke public permissions,
-    # even if text insertion or image embedding raises an exception. Without
-    # this, a crash mid-way would leave slide images publicly accessible.
+    # Wrap upload+grant AND insert in try/finally so we ALWAYS revoke public
+    # permissions on whatever was already granted — even if the upload loop
+    # itself fails partway (e.g. HttpError on the 5th of 10 slides).
+    # image_perms is initialized above, so finally iterates only what we
+    # actually managed to grant before the failure.
     try:
+        for s in slides:
+            img_id = upload_image_to_drive(drive, s["image_path"], folder_id)
+            perm_id = grant_anyone_read(drive, img_id)
+            image_perms[img_id] = perm_id
+            # Direct download link works for inlineImage
+            image_urls[s["index"]] = f"https://drive.google.com/uc?id={img_id}&export=download"
+
         # 3. Build batchUpdate requests — insert content from end to start
         # Working from end to start is easier because indices don't shift backward.
         # But here we build text first, then insert images.
