@@ -224,104 +224,108 @@ def build_google_doc(drive, docs, title: str,
         # Direct download link works for inlineImage
         image_urls[s["index"]] = f"https://drive.google.com/uc?id={img_id}&export=download"
 
-    # 3. Build batchUpdate requests — insert content from end to start
-    # Working from end to start is easier because indices don't shift backward.
-    # But here we build text first, then insert images.
-    #
-    # Simpler approach: build the whole text, insert it once, then insert images
-    # at known positions. We'll use a marker-based approach instead.
+    # Wrap the rest in try/finally so we ALWAYS revoke public permissions,
+    # even if text insertion or image embedding raises an exception. Without
+    # this, a crash mid-way would leave slide images publicly accessible.
+    try:
+        # 3. Build batchUpdate requests — insert content from end to start
+        # Working from end to start is easier because indices don't shift backward.
+        # But here we build text first, then insert images.
+        #
+        # Simpler approach: build the whole text, insert it once, then insert images
+        # at known positions. We'll use a marker-based approach instead.
 
-    # Build the doc text with placeholders for images
-    body_parts = []
-    body_parts.append(f"{title}\n\n")
+        # Build the doc text with placeholders for images
+        body_parts = []
+        body_parts.append(f"{title}\n\n")
 
-    image_anchors = []  # (text_position, image_url)
+        image_anchors = []  # (text_position, image_url)
 
-    for s in slides:
-        slide_header = f"Слайд {s['index']} ({s['start']} – {s['end']})\n"
-        body_parts.append(slide_header)
+        for s in slides:
+            slide_header = f"Слайд {s['index']} ({s['start']} – {s['end']})\n"
+            body_parts.append(slide_header)
 
-        # Anchor for image goes right after header
-        # Position will be calculated after we know where this slide starts
-        image_anchors.append({
-            "slide_index": s["index"],
-            "after_text": slide_header,
-            "url": image_urls[s["index"]],
-        })
+            # Anchor for image goes right after header
+            # Position will be calculated after we know where this slide starts
+            image_anchors.append({
+                "slide_index": s["index"],
+                "after_text": slide_header,
+                "url": image_urls[s["index"]],
+            })
 
-        body_parts.append("\n")  # blank line for image
+            body_parts.append("\n")  # blank line for image
 
-        if s["ocr"]:
-            body_parts.append("Текст зі слайда:\n")
-            body_parts.append(s["ocr"] + "\n\n")
+            if s["ocr"]:
+                body_parts.append("Текст зі слайда:\n")
+                body_parts.append(s["ocr"] + "\n\n")
 
-        if s["transcript"]:
-            body_parts.append("Розповідь:\n")
-            body_parts.append(s["transcript"] + "\n\n")
-        else:
-            body_parts.append("(тиша)\n\n")
+            if s["transcript"]:
+                body_parts.append("Розповідь:\n")
+                body_parts.append(s["transcript"] + "\n\n")
+            else:
+                body_parts.append("(тиша)\n\n")
 
-    full_text = "".join(body_parts)
+        full_text = "".join(body_parts)
 
-    # 4. Insert all text first
-    docs.documents().batchUpdate(
-        documentId=doc_id,
-        body={"requests": [{"insertText": {"location": {"index": 1}, "text": full_text}}]},
-    ).execute()
+        # 4. Insert all text first
+        docs.documents().batchUpdate(
+            documentId=doc_id,
+            body={"requests": [{"insertText": {"location": {"index": 1}, "text": full_text}}]},
+        ).execute()
 
-    # 5. Now find positions for images and insert them
-    # Re-fetch the document to get clean indices
-    image_requests = []
-    cursor = 1  # Docs body starts at index 1
-    cursor += len(f"{title}\n\n")
+        # 5. Now find positions for images and insert them
+        # Re-fetch the document to get clean indices
+        image_requests = []
+        cursor = 1  # Docs body starts at index 1
+        cursor += len(f"{title}\n\n")
 
-    for s, anchor in zip(slides, image_anchors):
-        slide_header_len = len(f"Слайд {s['index']} ({s['start']} – {s['end']})\n")
-        # Position after the slide header (where blank line is)
-        image_pos = cursor + slide_header_len
-        image_requests.append({
-            "insertInlineImage": {
-                "location": {"index": image_pos},
-                "uri": anchor["url"],
-                "objectSize": {
-                    "height": {"magnitude": 240, "unit": "PT"},
-                    "width": {"magnitude": 480, "unit": "PT"},
-                },
-            }
-        })
+        for s, anchor in zip(slides, image_anchors):
+            slide_header_len = len(f"Слайд {s['index']} ({s['start']} – {s['end']})\n")
+            # Position after the slide header (where blank line is)
+            image_pos = cursor + slide_header_len
+            image_requests.append({
+                "insertInlineImage": {
+                    "location": {"index": image_pos},
+                    "uri": anchor["url"],
+                    "objectSize": {
+                        "height": {"magnitude": 240, "unit": "PT"},
+                        "width": {"magnitude": 480, "unit": "PT"},
+                    },
+                }
+            })
 
-        # Advance cursor past everything in this slide section
-        section_len = slide_header_len + 1  # +1 for the blank line/image
-        if s["ocr"]:
-            section_len += len("Текст зі слайда:\n") + len(s["ocr"] + "\n\n")
-        if s["transcript"]:
-            section_len += len("Розповідь:\n") + len(s["transcript"] + "\n\n")
-        else:
-            section_len += len("(тиша)\n\n")
-        cursor += section_len
+            # Advance cursor past everything in this slide section
+            section_len = slide_header_len + 1  # +1 for the blank line/image
+            if s["ocr"]:
+                section_len += len("Текст зі слайда:\n") + len(s["ocr"] + "\n\n")
+            if s["transcript"]:
+                section_len += len("Розповідь:\n") + len(s["transcript"] + "\n\n")
+            else:
+                section_len += len("(тиша)\n\n")
+            cursor += section_len
 
-    # Insert images from end to start so indices don't shift
-    if image_requests:
-        # Reverse the order: highest index first
-        image_requests.sort(key=lambda r: -r["insertInlineImage"]["location"]["index"])
-        # Send in batches of 10 to avoid request size limits
-        BATCH = 10
-        for i in range(0, len(image_requests), BATCH):
-            chunk = image_requests[i:i + BATCH]
-            try:
-                docs.documents().batchUpdate(
-                    documentId=doc_id, body={"requests": chunk}
-                ).execute()
-            except HttpError as e:
-                print(f"      [warn] Image batch {i}-{i+BATCH} failed: {e}")
-
-    # Revoke 'anyone with link' permissions now that images are embedded.
-    # The Doc itself keeps its own copies/references; raw image files in Drive
-    # are no longer publicly accessible.
-    if image_perms:
-        print(f"      Revoking public access on {len(image_perms)} images...")
-        for file_id, perm_id in image_perms.items():
-            revoke_permission(drive, file_id, perm_id)
+        # Insert images from end to start so indices don't shift
+        if image_requests:
+            # Reverse the order: highest index first
+            image_requests.sort(key=lambda r: -r["insertInlineImage"]["location"]["index"])
+            # Send in batches of 10 to avoid request size limits
+            BATCH = 10
+            for i in range(0, len(image_requests), BATCH):
+                chunk = image_requests[i:i + BATCH]
+                try:
+                    docs.documents().batchUpdate(
+                        documentId=doc_id, body={"requests": chunk}
+                    ).execute()
+                except HttpError as e:
+                    print(f"      [warn] Image batch {i}-{i+BATCH} failed: {e}")
+    finally:
+        # Revoke 'anyone with link' permissions — runs even if anything above
+        # raised. The Doc itself keeps its embedded image copies; raw image
+        # files in Drive are no longer publicly accessible.
+        if image_perms:
+            print(f"      Revoking public access on {len(image_perms)} images...")
+            for file_id, perm_id in image_perms.items():
+                revoke_permission(drive, file_id, perm_id)
 
     doc_url = f"https://docs.google.com/document/d/{doc_id}/edit"
     return doc_id, doc_url
