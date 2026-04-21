@@ -1,169 +1,182 @@
 # lecture-notes
 
-Автоматичний конвеєр для перетворення записів онлайн-лекцій, демо та презентацій у структуровані конспекти зі слайдами, транскриптом і OCR. Працює локально з GPU-прискоренням, на виході — готовий Google Doc, який можна завантажити в NotebookLM чи поділитись з колегами.
+> 🇺🇸 English (you are here) · 🇺🇦 [Українська версія](README.uk.md)
 
-## Можливості
+**GPU-accelerated pipeline for converting lecture, webinar, and screencast recordings into searchable Google Docs.** Detects slide transitions automatically, transcribes audio in 100+ languages via [faster-whisper](https://github.com/SYSTRAN/faster-whisper), runs OCR on every slide, and assembles the result into a single well-structured Google Doc ready for NotebookLM, review, or sharing.
 
-- 🎥 Детекція змін слайдів у записі екрана
-- 🎙️ Транскрипція українською (або будь-якою іншою) через faster-whisper на GPU
-- 🖼️ Витяг ключового кадру кожного слайда
-- 🔗 Прив'язка розповіді до конкретного слайда за часом
-- 🔤 OCR слайдів через Google Drive API (найкраща якість для української)
-- 📄 Генерація готового Google Doc у папці `Lectures` з датою в назві
-- 🧠 Окремий текстовий варіант, оптимізований для завантаження в NotebookLM
+Built for Zoom, Google Meet, Microsoft Teams, and OBS recordings — anything where someone presents slides while talking.
 
-## Для кого
+## Why
 
-Протестовано на записах онлайн-зустрічей (Zoom, Meet, OBS) з трансляцією екрана — демо продуктів, воркшопи, презентації. Підтримує українську, англійську, російську, польську та інші мови (все, що підтримує whisper).
+Traditional solutions for turning a recorded lecture into notes are all bad in some way:
 
-## Мови
+- **Manual transcription** — hours of work per hour of video
+- **YouTube auto-captions** — no slides, poor formatting, limited languages
+- **Otter.ai / Fireflies** — no slide images, subscription, privacy concerns for internal content
+- **Whisper alone** — transcript only, no visual context
 
-За замовчуванням використовується автовизначення — whisper сам розпізнає мову з перших секунд. Якщо аудіо однорідне (одна мова весь час) — працює відмінно.
+This tool fills the gap: **one command, one Google Doc, slides + synchronized transcript + OCR on every slide**, all running locally on your GPU. Free forever. Works with any language Whisper supports.
 
-```bash
-# Автовизначення (дефолт)
-python process.py "lecture.mp4"
+## Features
 
-# Примусово конкретна мова
-python process.py "lecture.mp4" --language uk  # українська
-python process.py "lecture.mp4" --language en  # англійська
-python process.py "lecture.mp4" --language ru  # російська
-python process.py "lecture.mp4" --language pl  # польська
-```
+- 🎥 **Automatic slide detection** — scene-change algorithm tuned for screencasts with overlay webcam windows
+- 🎙️ **Multilingual transcription** — 100+ languages via faster-whisper, GPU-accelerated, auto-detection
+- 🖼️ **Key frame extraction** — one high-quality PNG per slide, offset past transitions
+- 🔗 **Time-synchronized narrative** — every transcript segment is attached to the slide that was on screen when it was spoken
+- 🔤 **Slide OCR** — Google Drive API OCR handles any text baked into slide images (diagrams, screenshots, non-editable PDFs). Excellent for Cyrillic, Latin, Arabic scripts alike.
+- 📄 **Google Doc output** — embeds slides inline, dated filename, organized in a `Lectures` folder
+- 🧠 **NotebookLM-friendly version** — separate plain-text file optimized for feeding into [NotebookLM](https://notebooklm.google.com/)
 
-### Mixed-language контент (суржик, code-switching)
+## Who it's for
 
-Whisper не має окремого режиму "суржик". Якщо твоє аудіо — українсько-російська суміш:
-- `--language uk` змушує whisper транскрибувати все в українській орфографії (рекомендовано)
-- `--language ru` — все в російській
-- `--language auto` може переключатись між сегментами (часто плутається на суржику)
+Tested extensively on recordings of:
+- Online meetings (Zoom, Google Meet, Microsoft Teams) with screen sharing
+- Product demos, internal workshops, training sessions
+- Conference talks, university lectures
+- OBS/local screen captures
 
-Для презентацій з термінологією іншою мовою (напр. українська розповідь + англійські терміни) — `--language uk` або `--language ru` зазвичай дає найкращий результат, бо whisper сам вставляє англіцизми.
+Supports any language Whisper supports (100+, including English, Spanish, Portuguese, French, German, Chinese, Japanese, Arabic, Russian, Ukrainian, Polish, and many more).
 
-## Privacy / Disclaimer
+## Example output
 
-Цей інструмент використовує Google Drive API. Кілька важливих моментів про дані:
+Input: one 1h 36m CRM demo recording (~40 slides, overlay webcam, CRM software UI in slides).
 
-**OCR (короткочасно):** слайди тимчасово завантажуються у твій Google Drive з параметром `ocrLanguage`, перетворюються в Google Doc (це тригерить Google OCR), текст читається, після чого тимчасовий документ автоматично видаляється.
+Output:
+- **39 slides** detected automatically, saved as PNG
+- **1,106 transcript segments** attached to the correct slide
+- **Single Google Doc** with inline slide images, OCR'd slide text, and full transcript
+- Processing time: **~12 minutes** on RTX 5060 Laptop (8 GB VRAM), `medium` Whisper model
 
-**Зображення слайдів (постійно):** оригінальні PNG-файли слайдів зберігаються у твоєму Drive у папці `Lectures` поряд з фінальним Google Doc. Вони залишаються там доти, доки ти їх не видалиш сам.
+## Quick start
 
-**⚠️ Тимчасова публічність на час вставки:** Google Docs API вимагає, щоб зображення були публічно доступні за посиланням у момент вставки в документ. Скрипт автоматично надає `anyone with link` дозвіл лише на час вставки і **одразу його забирає** після завершення. Проте у проміжку (~секунди-хвилини, залежно від кількості слайдів) зображення технічно доступні будь-кому з прямим посиланням. Для більшості випадків це прийнятно, але якщо обробляєш **дуже чутливі** дані (медичні, фінансові, NDA-матеріали) — врахуй цей short window.
+### Requirements
 
-**Альтернатива для конфіденційного контенту:** використовуй пайплайн **без** прапорця `--google-doc` — тоді нічого не йде у хмару взагалі, отримаєш лише локальний `notes.md` зі слайдами і транскриптом. Або заміни Google Drive OCR на локальний (PaddleOCR/Tesseract) — це невеликий додатковий модуль, який можна додати.
-
-## Приклад результату
-
-Вхід: одне відео 1:36 годин демо CRM-системи.
-Вихід:
-- **39 слайдів** автоматично виявлено і збережено як PNG
-- **1106 сегментів** розпізнаного тексту, прив'язаних до слайдів
-- **Google Doc** з вбудованими картинками, OCR-текстом і транскрипцією
-- Час обробки: ~12 хвилин на RTX 5060 Laptop
-
-## Швидкий старт
-
-### Вимоги
-
-- Windows 10/11 (тестовано)
-- Python 3.10-3.12
-- NVIDIA GPU з 6+ ГБ VRAM (для large-v3) або 4+ ГБ (для medium). CPU теж працює, але повільніше.
+- Windows 10/11, Linux, or macOS (Windows tested most extensively)
+- Python 3.10–3.12
+- NVIDIA GPU with 6+ GB VRAM for `large-v3`, or 4+ GB for `medium`. CPU works too (slower).
 - ffmpeg
-- Google акаунт (для OCR через Drive API)
+- Google account (only if you want the `--google-doc` output; the Markdown pipeline works offline)
 
-### Встановлення
+### Installation
 
 ```bash
-# 1. Склонуй репозиторій
+# 1. Clone
 git clone https://github.com/skoropysAlex/lecture-notes.git
 cd lecture-notes
 
-# 2. Створи venv
+# 2. Create virtualenv
 python -m venv venv
-# Windows
+# Windows:
 .\venv\Scripts\Activate.ps1
-# Linux/Mac
+# Linux/Mac:
 # source venv/bin/activate
 
-# 3. Встанови залежності
+# 3. Install Python dependencies
 pip install -r requirements.txt
 
-# 4. Встанови ffmpeg
+# 4. Install ffmpeg
 # Windows: winget install ffmpeg
-# Mac: brew install ffmpeg
-# Linux: sudo apt install ffmpeg
+# Mac:     brew install ffmpeg
+# Linux:   sudo apt install ffmpeg
 ```
 
-### Налаштування Google Drive API (опціонально, для --google-doc)
+### Google Drive API setup (optional, for `--google-doc`)
 
-1. Перейди в [Google Cloud Console](https://console.cloud.google.com/)
-2. Створи новий проект
-3. Увімкни Google Drive API і Google Docs API у бібліотеці
-4. OAuth Consent Screen → External → додай себе в Test Users
-5. Credentials → Create OAuth client ID → Desktop app
-6. Завантаж JSON, перейменуй у `credentials.json`, поклади в корінь проекту
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project
+3. Enable **Google Drive API** and **Google Docs API** in the library
+4. OAuth Consent Screen → External → add your own email to Test Users
+5. Credentials → Create OAuth client ID → **Desktop app**
+6. Download the JSON, rename to `credentials.json`, place in project root
 
-### Запуск
+### Run
 
 ```bash
-# Стадія 1 — транскрипція (довго)
+# Stage 1 — transcription (slow: ~10–15 min per hour of video on mid-range GPU)
 python process.py "lecture.mp4" --model medium
 
-# Стадія 2 — markdown + Google Doc з OCR (швидко, використовує кеш)
+# Stage 2 — Markdown + Google Doc with OCR (fast, uses cached transcript)
 python process.py "lecture.mp4" --model medium --google-doc
 ```
 
-Перший запуск з `--google-doc` відкриє браузер для авторизації.
+First `--google-doc` run opens a browser for OAuth authorization.
 
 ### Windows: drag-and-drop
 
-Перетягни відеофайл на `обробити_лекцію.bat` — виконає обидві стадії автоматично.
+Drop your video file onto `обробити_лекцію.bat` — both stages run automatically. (The name means "process lecture" in Ukrainian; rename freely.)
 
-## Параметри
+## Parameters
 
 ```
 python process.py <video> [options]
 
---model MODEL                 faster-whisper model: tiny, base, small, medium, 
+--model MODEL                 faster-whisper model: tiny, base, small, medium,
                               large-v3 (default: large-v3)
---language LANG               Код мови: auto, uk, en, ru, pl, та інші
-                              (default: auto — whisper сам визначить)
---no-confirm-language         Пропустити інтерактивне підтвердження мови.
-                              Корисно для batch/scripted запусків (саме це
-                              використовує обробити_лекцію.bat).
---scene-threshold FLOAT       Чутливість детекції слайдів, менше = чутливіше
-                              (default: 18, підібрано для screencast'ів)
---min-slide-duration FLOAT    Мінімальний інтервал між слайдами в секундах
+--language LANG               Language code: auto, en, es, pt, fr, de, uk, ru,
+                              pl, zh, ja, ar, and any other Whisper-supported
+                              code (default: auto — Whisper detects)
+--no-confirm-language         Skip interactive language confirmation. Useful
+                              for batch/scripted runs (used by the .bat file).
+--scene-threshold FLOAT       Slide-change sensitivity, lower = more sensitive
+                              (default: 18, tuned for screencasts with overlay
+                              webcams)
+--min-slide-duration FLOAT    Minimum seconds between slide changes
                               (default: 5)
---google-doc                  Завантажити результат як Google Doc з OCR
---gdrive-parent-folder NAME   Назва папки в Drive (default: Lectures)
---output-dir DIR              Локальна папка для результатів (default: ./output)
+--google-doc                  Upload result as Google Doc with OCR
+--gdrive-parent-folder NAME   Drive folder name (default: Lectures)
+--output-dir DIR              Local output folder (default: ./output)
 ```
 
-## Чому дві стадії
+## Mixed-language content
 
-На деяких конфігураціях (NVIDIA Blackwell + CUDA 13 + ctranslate2) Python-процес падає без traceback одразу після завершення транскрипції. Щоб не втрачати 15 хвилин GPU-роботи при кожному крашу, транскрипт кешується в JSON одразу після whisper. Другий запуск детектить кеш і оминає GPU-код взагалі, працює в чистому процесі.
+For content with multiple languages (technical terms in English inside a non-English presentation, code-switching, etc.):
+- Force the dominant language with `--language <code>` — Whisper will keep foreign terms as-is in that language's orthography
+- `--language auto` may switch between segments (sometimes wrongly)
 
-Якщо на твоєму залізі крашу немає — можна об'єднати стадії одним викликом з `--google-doc`.
+## Privacy & disclaimer
 
-## Архітектура
+This tool uses Google Drive API. A few important data-handling notes:
+
+**OCR (short-lived):** slide images are temporarily uploaded to your Drive with `ocrLanguage` set, converted to Google Docs (which triggers Google's OCR), the text is read, and the temporary doc is deleted. Only the image files remain.
+
+**Slide images (persistent):** the original PNG files of slides stay in your Drive inside the `Lectures` folder next to the final Google Doc. They remain there until you delete them.
+
+**⚠️ Brief public exposure during embedding:** Google Docs API requires images to be publicly accessible when inserting them into a document (the API fetches the URL server-side). The script grants `anyone with link` read access *temporarily* and revokes it immediately after insertion. For most use cases this is fine, but if you're processing **highly sensitive content** (medical, financial, NDA material), be aware of this short window (seconds to minutes depending on slide count).
+
+**For confidential content:** run the pipeline **without** `--google-doc` — nothing leaves your machine, you still get local `notes.md` with slides and transcript. Or swap Google Drive OCR for a local alternative (PaddleOCR / Tesseract) — a small additional module.
+
+## Why two stages?
+
+On some hardware configurations (NVIDIA Blackwell RTX 50-series + CUDA 13 + ctranslate2), the Python process crashes silently without a traceback immediately after Whisper finishes transcribing. To avoid losing 15 minutes of GPU work on every crash, the transcript is cached to JSON immediately after the transcription completes. The second run detects the cache, skips the GPU code entirely, and runs in a clean process.
+
+If your hardware doesn't trigger this crash, you can merge both stages into a single call with `--google-doc`.
+
+## Architecture
 
 ```
 video.mp4
     ├─→ PySceneDetect      → timestamps
     ├─→ ffmpeg             → slides/*.png
-    ├─→ faster-whisper     → transcript.json (кеш)
+    ├─→ faster-whisper     → transcript.json (cached)
     ├─→ merge by timestamp → notes.md + notes_for_notebooklm.md
     └─→ Google Drive API   → OCR + final Google Doc
 ```
 
-## Стек
+## Stack
 
-- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — транскрипція
-- [PySceneDetect](https://github.com/Breakthrough/PySceneDetect) — детекція змін кадру
-- [ffmpeg](https://ffmpeg.org/) — витяг кадрів, обробка медіа
-- [Google Drive/Docs API](https://developers.google.com/drive) — OCR та створення документів
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — transcription (ctranslate2-based, GPU accelerated)
+- [PySceneDetect](https://github.com/Breakthrough/PySceneDetect) — scene-change detection
+- [ffmpeg](https://ffmpeg.org/) — frame extraction, media processing
+- [Google Drive/Docs API](https://developers.google.com/drive) — OCR and document generation
 
-## Ліцензія
+## Contributing
 
-MIT
+Issues and pull requests welcome. Particularly interested in:
+- Alternative local OCR backends (PaddleOCR, Tesseract) for fully offline workflows
+- Testing on macOS and Linux with Apple Silicon / AMD GPUs
+- Better slide deduplication for presentations with animated transitions
+- Support for other note-taking destinations (Notion, Obsidian, Logseq)
+
+## License
+
+[MIT](LICENSE)
