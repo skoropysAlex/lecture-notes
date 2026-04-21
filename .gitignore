@@ -1,4 +1,4 @@
-﻿# --- SECRETS: НІКОЛИ не комітити ---
+﻿# --- SECRETS: NEVER commit these ---
 credentials.json
 token.json
 *.credentials.json
@@ -44,7 +44,7 @@ models/
 *.tmp
 *.bak
 
-# --- Video files (зайві в репо) ---
+# --- Video files (shouldn't be in repo) ---
 *.mp4
 *.mov
 *.mkv

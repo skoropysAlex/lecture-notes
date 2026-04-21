@@ -245,7 +245,7 @@ def build_google_doc(drive, docs, title: str,
         image_anchors = []  # (text_position, image_url)
 
         for s in slides:
-            slide_header = f"Слайд {s['index']} ({s['start']} – {s['end']})\n"
+            slide_header = f"Slide {s['index']} ({s['start']} – {s['end']})\n"
             body_parts.append(slide_header)
 
             # Anchor for image goes right after header
@@ -259,14 +259,14 @@ def build_google_doc(drive, docs, title: str,
             body_parts.append("\n")  # blank line for image
 
             if s["ocr"]:
-                body_parts.append("Текст зі слайда:\n")
+                body_parts.append("Slide text (OCR):\n")
                 body_parts.append(s["ocr"] + "\n\n")
 
             if s["transcript"]:
-                body_parts.append("Розповідь:\n")
+                body_parts.append("Narration:\n")
                 body_parts.append(s["transcript"] + "\n\n")
             else:
-                body_parts.append("(тиша)\n\n")
+                body_parts.append("(silence)\n\n")
 
         full_text = "".join(body_parts)
 
@@ -283,7 +283,7 @@ def build_google_doc(drive, docs, title: str,
         cursor += len(f"{title}\n\n")
 
         for s, anchor in zip(slides, image_anchors):
-            slide_header_len = len(f"Слайд {s['index']} ({s['start']} – {s['end']})\n")
+            slide_header_len = len(f"Slide {s['index']} ({s['start']} – {s['end']})\n")
             # Position after the slide header (where blank line is)
             image_pos = cursor + slide_header_len
             image_requests.append({
@@ -300,11 +300,11 @@ def build_google_doc(drive, docs, title: str,
             # Advance cursor past everything in this slide section
             section_len = slide_header_len + 1  # +1 for the blank line/image
             if s["ocr"]:
-                section_len += len("Текст зі слайда:\n") + len(s["ocr"] + "\n\n")
+                section_len += len("Slide text (OCR):\n") + len(s["ocr"] + "\n\n")
             if s["transcript"]:
-                section_len += len("Розповідь:\n") + len(s["transcript"] + "\n\n")
+                section_len += len("Narration:\n") + len(s["transcript"] + "\n\n")
             else:
-                section_len += len("(тиша)\n\n")
+                section_len += len("(silence)\n\n")
             cursor += section_len
 
         # Insert images from end to start so indices don't shift

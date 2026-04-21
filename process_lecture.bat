@@ -25,10 +25,10 @@ if not "%~1"=="" (
 REM Otherwise — ask for path
 echo.
 echo ==========================================================
-echo   Обробка лекції ^(транскрипт + Google Doc^)
+echo   Process lecture ^(transcript + Google Doc^)
 echo ==========================================================
 echo.
-set /p "VIDEO=Перетягни відеофайл сюди ^(або введи шлях^) і натисни Enter: "
+set /p "VIDEO=Drag a video file here ^(or type its path^) and press Enter: "
 
 REM Strip quotes if user dragged a file into the prompt
 set VIDEO=%VIDEO:"=%
@@ -36,20 +36,20 @@ set VIDEO=%VIDEO:"=%
 :run
 if not exist "%VIDEO%" (
     echo.
-    echo [ERROR] Файл не знайдено: %VIDEO%
+    echo [ERROR] File not found: %VIDEO%
     pause
     exit /b 1
 )
 
 echo.
-echo Обробляю: %VIDEO%
+echo Processing: %VIDEO%
 echo.
 
 REM Activate venv
 call "%~dp0venv\Scripts\activate.bat"
 if errorlevel 1 (
-    echo [ERROR] Не вдалось активувати venv.
-    echo Перевір чи папка venv існує в %~dp0
+    echo [ERROR] Failed to activate venv.
+    echo Check that the venv folder exists in %~dp0
     pause
     exit /b 1
 )
@@ -59,7 +59,7 @@ REM Uses medium model by default — change to large-v3 for better quality (slow
 REM --no-confirm-language: skip interactive language prompt so drag-and-drop
 REM doesn't hang waiting for input. Whisper auto-detects from first 30s.
 echo ==========================================================
-echo   Етап 1/2: Транскрипція ^(GPU, ~10-15 хв на годину відео^)
+echo   Stage 1/2: Transcription ^(GPU, ~10-15 min per hour of video^)
 echo ==========================================================
 echo.
 
@@ -70,23 +70,23 @@ REM that's OK, the transcript was cached. We just continue to stage 2.
 
 echo.
 echo ==========================================================
-echo   Етап 2/2: Markdown + Google Doc з OCR
+echo   Stage 2/2: Markdown + Google Doc with OCR
 echo ==========================================================
 echo.
 
 python process.py "%VIDEO%" --model medium --google-doc --no-confirm-language
 if errorlevel 1 (
     echo.
-    echo [ERROR] Етап 2 завершився з помилкою.
+    echo [ERROR] Stage 2 failed.
     pause
     exit /b 1
 )
 
 echo.
 echo ==========================================================
-echo   ✓ Готово! Результати:
-echo     - Локальні файли у папці output\
-echo     - Google Doc — посилання вище в логах
+echo   Done! Results:
+echo     - Local files in the output\ folder
+echo     - Google Doc link shown in the logs above
 echo ==========================================================
 echo.
 pause

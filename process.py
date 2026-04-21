@@ -173,13 +173,18 @@ def confirm_language(detected: str, confidence: float) -> str:
     Returns the final language code to use.
     """
     COMMON = {
-        "uk": "Українська",
         "en": "English",
-        "ru": "Русский",
-        "pl": "Polski",
-        "de": "Deutsch",
-        "es": "Español",
-        "fr": "Français",
+        "es": "Spanish",
+        "fr": "French",
+        "de": "German",
+        "pt": "Portuguese",
+        "it": "Italian",
+        "pl": "Polish",
+        "uk": "Ukrainian",
+        "ru": "Russian",
+        "zh": "Chinese",
+        "ja": "Japanese",
+        "ar": "Arabic",
     }
     detected_name = COMMON.get(detected, detected)
 
@@ -193,7 +198,7 @@ def confirm_language(detected: str, confidence: float) -> str:
     print(f"      Detected: {detected} ({detected_name}) at {confidence:.0%} confidence")
     print("      Options:")
     print(f"        [Enter] Use {detected}")
-    print("        uk, en, ru, pl, de, es, fr — force this language")
+    print("        en, es, fr, de, pt, it, pl, uk, ru, zh, ja, ar — force this language")
     print("        (any other whisper code also works)")
     choice = input("      Your choice: ").strip().lower()
 
@@ -325,8 +330,8 @@ def build_notebooklm_text(video_name: str, slide_timestamps: list[float],
     lines = [
         f"# {video_name}",
         "",
-        f"Загальна тривалість: {format_ts(total_duration)}",
-        f"Кількість слайдів: {len(slide_timestamps)}",
+        f"Total duration: {format_ts(total_duration)}",
+        f"Number of slides: {len(slide_timestamps)}",
         "",
         "---",
         "",
@@ -344,20 +349,20 @@ def build_notebooklm_text(video_name: str, slide_timestamps: list[float],
         ]
 
         # Header with time range — helps NotebookLM understand the context
-        lines.append(f"## Слайд {i} ({format_ts(start)} – {format_ts(end)})")
+        lines.append(f"## Slide {i} ({format_ts(start)} – {format_ts(end)})")
         lines.append("")
-        lines.append(f"_Зображення слайда: {frame_path.name}_")
+        lines.append(f"_Slide image: {frame_path.name}_")
         lines.append("")
 
         if slide_segments:
-            lines.append("**Розповідь:**")
+            lines.append("**Narration:**")
             lines.append("")
             # Glue segments into flowing paragraphs (no per-line timestamps —
             # NotebookLM works better with prose than with timestamped lists)
             paragraph = " ".join(s["text"] for s in slide_segments)
             lines.append(paragraph)
         else:
-            lines.append("_(тиша / без коментарів лектора)_")
+            lines.append("_(silence / no narration on this slide)_")
 
         lines.append("")
         lines.append("")

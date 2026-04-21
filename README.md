@@ -103,7 +103,7 @@ First `--google-doc` run opens a browser for OAuth authorization.
 
 ### Windows: drag-and-drop
 
-Drop your video file onto `обробити_лекцію.bat` — both stages run automatically. (The name means "process lecture" in Ukrainian; rename freely.)
+Drop your video file onto `process_lecture.bat` — both stages run automatically.
 
 ## Parameters
 

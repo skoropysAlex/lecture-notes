@@ -119,7 +119,7 @@ python process.py "lecture.mp4" --model medium --google-doc
 
 ### Windows: drag-and-drop
 
-Перетягни відеофайл на `обробити_лекцію.bat` — виконає обидві стадії автоматично.
+Перетягни відеофайл на `process_lecture.bat` — виконає обидві стадії автоматично.
 
 ## Параметри
 
@@ -132,7 +132,7 @@ python process.py <video> [options]
                               (default: auto — whisper сам визначить)
 --no-confirm-language         Пропустити інтерактивне підтвердження мови.
                               Корисно для batch/scripted запусків (саме це
-                              використовує обробити_лекцію.bat).
+                              використовує process_lecture.bat).
 --scene-threshold FLOAT       Чутливість детекції слайдів, менше = чутливіше
                               (default: 18, підібрано для screencast'ів)
 --min-slide-duration FLOAT    Мінімальний інтервал між слайдами в секундах
